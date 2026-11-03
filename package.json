@@ -1,0 +1,18 @@
+{
+  "name": "equestrian-backend-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Supabase/PostgreSQL backend foundation for a multi-role equestrian platform: RLS with one central permission check, versioned API schema, idempotent sensor uploads, delta sync. Tested in-process, no Docker.",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.14",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
