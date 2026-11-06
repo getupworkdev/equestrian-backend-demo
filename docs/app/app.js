@@ -64,8 +64,15 @@ async function openDb(setText, retry = false) {
   // Decide "already seeded" from the database itself, not from localStorage:
   // some browsers keep IndexedDB but drop localStorage (or the reverse), and a
   // half-finished first run must not be mistaken for a finished one.
-  const seeded = await db.query(`select 1 from app.stables where name = 'Willow Farm' limit 1`);
-  if (!seeded.rows.length) {
+  const farms = Number((await db.query(`select count(*) as n from app.stables where name = 'Willow Farm'`)).rows[0].n);
+  if (farms > 1) {   // an earlier version seeded twice on some phones; rebuild
+    setText('Repairing the stable');
+    await db.close().catch(() => {});
+    await resetDb();
+    if (retry) throw new Error('could not repair the database');
+    return openDb(setText, true);
+  }
+  if (farms === 0) {
     setText('Loading the stable');
     try {
       await seed();
@@ -214,6 +221,7 @@ function signIn() {
       ${Object.entries(PEOPLE).map(([k, p]) => `<button data-me="${k}"><b>${esc(p.name)}</b><span>${esc(p.blurb)}</span></button>`).join('')}
       <button class="ghost" data-me="visitor"><b>Continue without an account</b><span>You can scan a product and read its passport</span></button>
     </div>
+    <p class="small" style="color:rgba(255,255,255,.6);margin-top:auto"><button class="link" data-act="reset" style="color:inherit;font-size:inherit;padding:0;width:auto;min-height:0">Reset the demo data on this device</button></p>
   </div>`);
 }
 
@@ -425,8 +433,8 @@ async function action(el) {
   } else if (a === 'reset') {
     if (!confirm('Reset the demo data on this device?')) return;
     store.set('stable.seeded', false); store.set('stable.queue', []); store.set('stable.schema', null); store.set('stable.lastScan', '');
-    await db.close?.();
-    await new Promise((r) => { const q = indexedDB.deleteDatabase('/pglite/stable-app'); q.onsuccess = q.onerror = q.onblocked = () => r(); });
+    await db?.close?.().catch(() => {});
+    await resetDb();
     location.reload();
   } else if (a === 'create-horse') {
     const name = $('#n-name').value.trim(); if (!name) return toast('Give the horse a name.', true);
@@ -461,9 +469,11 @@ async function route() {
 }
 
 window.addEventListener('hashchange', route);
+window.addEventListener('unhandledrejection', (e) => toast(`Something went wrong: ${String(e.reason?.message || e.reason).slice(0, 120)}`, true));
+window.addEventListener('error', (e) => toast(`Something went wrong: ${String(e.message).slice(0, 120)}`, true));
 document.addEventListener('click', (e) => {
   const me_ = e.target.closest('[data-me]');
-  if (me_) { me = me_.dataset.me; store.set('stable.me', me); const to = me === 'visitor' ? '#/scan' : '#/home'; if (location.hash === to) route(); else location.hash = to; return; }
+  if (me_) { me = me_.dataset.me; store.set('stable.me', me); me_.style.opacity = '.6'; me_.querySelector('span').textContent = 'Opening…'; const to = me === 'visitor' ? '#/scan' : '#/home'; if (location.hash === to) route(); else location.hash = to; return; }
   const go = e.target.closest('[data-go]'); if (go) { location.hash = go.dataset.go; return; }
   const act = e.target.closest('[data-act]'); if (act) { action(act); return; }
 });
