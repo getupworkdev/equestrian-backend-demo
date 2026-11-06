@@ -32,6 +32,18 @@ export async function as<T>(db: PGlite, userId: string | null, fn: (q: Q) => Pro
   });
 }
 
+/** Run `fn` as the service role, the way an Edge Function with the service key does. */
+export async function asService<T>(db: PGlite, fn: (q: Q) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.exec(`set local role service_role`);
+    return fn({
+      rows: async (sql, params) => (await tx.query(sql, params)).rows as any[],
+      one: async (sql, params) => ((await tx.query(sql, params)).rows as any[])[0],
+      run: async (sql, params) => { await tx.query(sql, params); },
+    });
+  });
+}
+
 export type Q = {
   rows: (sql: string, params?: unknown[]) => Promise<any[]>;
   one: (sql: string, params?: unknown[]) => Promise<any>;
