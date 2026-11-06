@@ -6,7 +6,8 @@
   "description": "Supabase/PostgreSQL backend foundation for a multi-role equestrian platform: RLS with one central permission check, versioned API schema, idempotent sensor uploads, delta sync. Tested in-process, no Docker.",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "contract": "UPDATE_CONTRACT=1 vitest run tests/contract.test.ts"
   },
   "license": "MIT",
   "devDependencies": {
