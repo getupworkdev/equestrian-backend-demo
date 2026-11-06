@@ -34,31 +34,51 @@ let queue = store.get('stable.queue', []);        // writes made with no signal,
 // ---------------------------------------------------------------------------
 // Database: open, migrate once, seed once
 // ---------------------------------------------------------------------------
-async function openDb(setText) {
+const resetDb = () => new Promise((r) => { const q = indexedDB.deleteDatabase('/pglite/stable-app'); q.onsuccess = q.onerror = q.onblocked = () => r(); });
+
+async function openDb(setText, retry = false) {
   const files = await (await fetch('../sql/index.json')).json();
   const stamp = files.join('|');
-  const prev = store.get('stable.schema', null);
-  const dataDir = 'idb://stable-app';
-  if (prev && prev !== stamp) {
-    setText('Updating the database…');
-    await new Promise((r) => { const q = indexedDB.deleteDatabase('/pglite/stable-app'); q.onsuccess = q.onerror = q.onblocked = () => r(); });
-    store.set('stable.seeded', false);
-  }
-  db = new PGlite(dataDir);
+  db = new PGlite('idb://stable-app');
   await db.waitReady;
-  const has = await db.query(`select 1 from information_schema.schemata where schema_name = 'api_v1'`);
-  if (!has.rows.length) {
+  // Which migrations this database was built from is recorded in the database
+  // itself (localStorage and IndexedDB are cleared independently on some phones).
+  await db.exec(`create table if not exists public.demo_meta (k text primary key, v text not null)`);
+  const prev = (await db.query(`select v from public.demo_meta where k = 'schema'`)).rows[0]?.v ?? null;
+  const half = !prev && (await db.query(`select 1 from information_schema.schemata where schema_name = 'api_v1'`)).rows.length;
+  if ((prev && prev !== stamp) || half) {   // other migrations, or a first run that was interrupted
+    setText('Updating the database…');
+    await db.close().catch(() => {});
+    await resetDb();
+    if (retry) throw new Error('could not reset the database');
+    return openDb(setText, true);
+  }
+  if (!prev) {
     for (const f of files) {
       setText(`Applying ${f}`);
       await db.exec(await (await fetch(`../sql/${f}`)).text());
     }
+    await db.query(`insert into public.demo_meta (k, v) values ('schema', $1) on conflict (k) do update set v = excluded.v`, [stamp]);
   }
   store.set('stable.schema', stamp);
-  if (!store.get('stable.seeded', false)) {
+  // Decide "already seeded" from the database itself, not from localStorage:
+  // some browsers keep IndexedDB but drop localStorage (or the reverse), and a
+  // half-finished first run must not be mistaken for a finished one.
+  const seeded = await db.query(`select 1 from app.stables where name = 'Willow Farm' limit 1`);
+  if (!seeded.rows.length) {
     setText('Loading the stable');
-    await seed();
-    store.set('stable.seeded', true);
+    try {
+      await seed();
+    } catch (e) {
+      // A partial seed can't be continued; start the database over once.
+      setText('Resetting the stable');
+      await db.close().catch(() => {});
+      await resetDb();
+      if (retry) throw e;
+      return openDb(setText, true);
+    }
   }
+  store.set('stable.seeded', true);
 }
 
 // One call as one person, the way PostgREST runs it on Supabase.
@@ -454,7 +474,13 @@ document.addEventListener('change', (e) => {
 
 (async () => {
   try {
-    await openDb((t) => { const b = $('#boot-text'); if (b) b.textContent = t; });
+    const started = Date.now();
+    const setText = (t) => { const b = $('#boot-text'); if (b) b.textContent = t; };
+    const slow = setInterval(() => {
+      const s = Math.round((Date.now() - started) / 1000);
+      const n = $('#boot-note'); if (n && s >= 6) n.textContent = `First start downloads the database engine (15 MB) and builds a sample stable on this phone. ${s} s so far; it opens instantly after this.`;
+    }, 1000);
+    try { await openDb(setText); } finally { clearInterval(slow); }
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
     route();
   } catch (e) {
