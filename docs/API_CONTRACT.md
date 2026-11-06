@@ -4,9 +4,23 @@ Generated from the database by `npm run contract` (comments in `supabase/migrati
 
 Reads are views queried through the Supabase Data API (`/rest/v1/<view>` with `Accept-Profile: api_v1`); every row is filtered by Row Level Security. Writes are SQL functions (`/rest/v1/rpc/<name>` with `Content-Profile: api_v1`). Errors are raised with a readable message and a SQLSTATE code the apps can switch on.
 
-6 views, 13 functions.
+9 views, 13 functions.
 
 ## Reads (views)
+
+### `horse_people`
+
+Members of every horse the caller may see, with their display name and role (owner, trainer, caretaker).
+
+Readable by: signed-in users.
+
+| Column | Type |
+| --- | --- |
+| `horse_id` | uuid |
+| `user_id` | uuid |
+| `display_name` | text |
+| `role` | app.horse_role |
+| `created_at` | timestamp with time zone |
 
 ### `horses`
 
@@ -38,6 +52,17 @@ Readable by: signed-in users.
 | `horse_id` | uuid |
 | `registered_at` | timestamp with time zone |
 
+### `people`
+
+People the caller can see and invite: anyone sharing a horse or a stable with them.
+
+Readable by: signed-in users.
+
+| Column | Type |
+| --- | --- |
+| `id` | uuid |
+| `display_name` | text |
+
 ### `sensor_devices`
 
 Bluetooth sensors registered to horses the caller may see.
@@ -65,6 +90,19 @@ Readable by: signed-in users.
 | `measured_at` | timestamp with time zone |
 | `temperature` | numeric(5,2) |
 | `humidity` | numeric(5,2) |
+
+### `stable_members`
+
+Members of the caller's stables: a manager sees everyone at the stable, staff see themselves.
+
+Readable by: signed-in users.
+
+| Column | Type |
+| --- | --- |
+| `stable_id` | uuid |
+| `user_id` | uuid |
+| `display_name` | text |
+| `role` | app.stable_role |
 
 ### `stables`
 

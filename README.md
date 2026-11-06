@@ -1,8 +1,10 @@
 # Equestrian platform backend: the foundation
 
-A Supabase/PostgreSQL backend foundation for a mobile platform where one person can be the **owner of one horse and the trainer of another**, with a Bluetooth sensor that records readings offline, QR product registration with a digital product passport, and reliable integrations with external systems. Written as versioned migrations and proven by 56 tests that run in-process, with no Supabase account or Docker.
+A Supabase/PostgreSQL backend foundation for a mobile platform where one person can be the **owner of one horse and the trainer of another**, with a Bluetooth sensor that records readings offline, QR product registration with a digital product passport, and reliable integrations with external systems. Written as versioned migrations and proven by 61 tests that run in-process, with no Supabase account or Docker.
 
-**Try it live: [getupworkdev.github.io/equestrian-backend-demo](https://getupworkdev.github.io/equestrian-backend-demo/)**. The same migrations run in PostgreSQL inside your browser: a grid of who can do what (every mark is a real call), each person's app screen drawn from what the API returns, a QR passport scan, an offline sensor upload sent twice, and the outbox filling up.
+**Try the app: [getupworkdev.github.io/equestrian-backend-demo/app](https://getupworkdev.github.io/equestrian-backend-demo/app/)**. A working phone app on these exact migrations: the database runs on your device, so open it on a phone, pick a person, log training with no signal and watch it sync, scan a product and register it, and see what a stable manager can and cannot do. Add it to your home screen and it opens offline.
+
+**Explore the rules: [getupworkdev.github.io/equestrian-backend-demo](https://getupworkdev.github.io/equestrian-backend-demo/)**. The same migrations run in PostgreSQL inside your browser: a grid of who can do what (every mark is a real call), each person's app screen drawn from what the API returns, a QR passport scan, an offline sensor upload sent twice, and the outbox filling up.
 
 ![Permission grid: every mark is a real call to the API as that person](docs/screenshots/permission-grid.png)
 
@@ -10,7 +12,7 @@ A Supabase/PostgreSQL backend foundation for a mobile platform where one person 
 
 ```bash
 npm install
-npm test           # 56 tests, ~15 s
+npm test           # 61 tests, ~15 s
 npm run contract   # regenerate docs/API_CONTRACT.md after changing the API
 npm run pages      # refresh the live page's copy of the migrations
 ```
@@ -63,6 +65,10 @@ The tests also prove the policies can't be bypassed: direct writes to `app.*` ar
 - **Inbound webhooks.** `webhook-receiver` verifies the signature on the raw body (with a 5-minute replay window and a constant-time compare) before parsing anything, then stores the event once per (provider, event id): a re-delivery is answered "duplicate" and not processed again.
 - **Signed media URLs.** `horse-media-url` asks the database, as the user, whether they may read or upload a horse's photos (`api_v1.authorize_horse_media`, same permission check), then signs a short-lived Storage URL with the service key. The bucket stays private.
 - The signature and delivery rules are plain modules in [`_shared`](supabase/functions/_shared), tested in [`tests/integrations.test.ts`](tests/integrations.test.ts) together with the backoff schedule and the permission checks.
+
+### People on a horse ([`0007_people.sql`](supabase/migrations/0007_people.sql))
+
+Who else is on my horse, and who can I invite: a profile is visible to anyone who shares a horse or a stable with it, and everyone who may see a horse may see its members. This migration also fixes a policy in 0001 that looked up `stable_members` inside its own policy (Postgres refuses that as infinite recursion the first time a user reads `api_v1.stables`); the tests now read every view as every role, so that class of bug fails CI.
 
 ### An API contract that can't drift ([`docs/API_CONTRACT.md`](docs/API_CONTRACT.md))
 
