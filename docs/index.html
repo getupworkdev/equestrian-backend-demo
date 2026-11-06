@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Equestrian backend, live</title>
+<meta name="description" content="The real Supabase migrations of this repository running in PostgreSQL inside the browser: who can do what, QR product passport, offline sensor upload, transactional outbox.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="explorer.css">
+</head>
+<body>
+<main>
+  <header class="intro">
+    <h1>Who can do what with Storm and Luna</h1>
+    <p class="lede">This page runs the real migrations from <a href="https://github.com/getupworkdev/equestrian-backend-demo">this repository</a> in PostgreSQL, compiled to WebAssembly, inside your browser. Every answer below comes from the database's own permission rules. Nothing is mocked, and nothing leaves this page.</p>
+    <p class="status" id="status" role="status"><span class="dot"></span>Starting PostgreSQL in your browser</p>
+  </header>
+
+  <section class="grid-section" aria-labelledby="grid-title">
+    <h2 id="grid-title" class="visually-hidden">Permission grid</h2>
+    <div class="grid-wrap" id="grid-wrap">
+      <table class="grid" id="grid" aria-describedby="grid-note">
+        <thead>
+          <tr>
+            <th scope="col" class="corner">Action</th>
+            <th scope="col"><span class="who">Anna</span><span class="role">owns Storm, trains Luna</span></th>
+            <th scope="col"><span class="who">Ben</span><span class="role">owns Luna, staff at Willow Farm</span></th>
+            <th scope="col"><span class="who">Carl</span><span class="role">caretaker of Storm</span></th>
+            <th scope="col"><span class="who">Dana</span><span class="role">manages Willow Farm, where Luna lives</span></th>
+            <th scope="col"><span class="who">Eve</span><span class="role">no roles</span></th>
+            <th scope="col"><span class="who">Visitor</span><span class="role">not signed in</span></th>
+          </tr>
+        </thead>
+        <tbody id="grid-body"></tbody>
+      </table>
+    </div>
+    <p class="note swipe">Swipe the table sideways to see everyone.</p>
+    <p class="note" id="grid-note">Each mark is one call to the API as that person, rolled back afterwards. Select a mark to see the call and the database's answer.</p>
+    <div class="detail" id="detail" aria-live="polite" hidden></div>
+  </section>
+
+  <section class="story phone-section" aria-labelledby="phone-title">
+    <div class="phone-copy">
+      <h2 id="phone-title">The same rules, as each person's app</h2>
+      <p>The screen is drawn from what the API returns for that person. A button they may not use stays visible but disabled, with the database's own reason underneath, so the iOS and Android apps never need their own copy of the rules.</p>
+      <fieldset>
+        <legend>Open the app as</legend>
+        <div class="buttons">
+          <button type="button" data-phone="anna">Anna</button>
+          <button type="button" data-phone="ben">Ben</button>
+          <button type="button" data-phone="carl">Carl</button>
+          <button type="button" data-phone="dana">Dana</button>
+          <button type="button" data-phone="eve">Eve</button>
+          <button type="button" data-phone="visitor">A visitor</button>
+        </div>
+      </fieldset>
+      <p class="note">Register the rug or upload Storm's readings further down, and the app updates.</p>
+    </div>
+    <div class="phone" aria-label="App preview">
+      <div class="phone-notch" aria-hidden="true"></div>
+      <div class="phone-screen" id="phone-screen"><p class="app-loading">Starting…</p></div>
+    </div>
+  </section>
+
+  <section class="story" aria-labelledby="qr-title">
+    <h2 id="qr-title">Scan the rug's QR code</h2>
+    <p>Anyone can scan a product without an account and read its public passport. Only the registered owner sees whose horse it is on and how it changed hands.</p>
+    <div class="qr-layout">
+      <figure class="qr">
+        <div id="qr-code" class="qr-code" aria-hidden="true"></div>
+        <figcaption><code id="qr-text">EQ-7K4Q29XD3M</code><span>Thermo Turnout 200g rug</span></figcaption>
+      </figure>
+      <div class="qr-controls">
+        <fieldset>
+          <legend>Scan as</legend>
+          <div class="buttons">
+            <button type="button" data-scan="visitor">A visitor</button>
+            <button type="button" data-scan="anna">Anna</button>
+            <button type="button" data-scan="ben">Ben</button>
+            <button type="button" data-scan="eve">Eve</button>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Change who owns it</legend>
+          <div class="buttons">
+            <button type="button" data-act="register">Anna registers it to Storm</button>
+            <button type="button" data-act="steal">Eve tries to register it</button>
+            <button type="button" data-act="transfer">Anna transfers it to Ben</button>
+          </div>
+        </fieldset>
+        <ul class="log" id="qr-log" aria-live="polite"></ul>
+      </div>
+      <div class="passport" id="passport" aria-live="polite">
+        <p class="empty">Scan the code to read its passport.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="story" aria-labelledby="sync-title">
+    <h2 id="sync-title">Upload Storm's sensor readings from a phone that was offline</h2>
+    <p>The phone buffered six readings in the stable with no signal. Each carries the sensor's own sequence number, so sending a batch twice never stores a reading twice.</p>
+    <div class="sync-layout">
+      <div class="buttons stacked">
+        <button type="button" data-batch="first">Upload the batch (readings 1 to 6)</button>
+        <button type="button" data-batch="again">The connection dropped: send the same batch again</button>
+        <button type="button" data-batch="next">Upload the next batch (readings 5 to 9)</button>
+      </div>
+      <table class="results" aria-describedby="sync-note">
+        <thead><tr><th scope="col">Batch</th><th scope="col">New</th><th scope="col">Already stored</th><th scope="col">Phone's watermark</th></tr></thead>
+        <tbody id="sync-body"><tr class="placeholder"><td colspan="4">No uploads yet.</td></tr></tbody>
+      </table>
+    </div>
+    <p class="note" id="sync-note">Uploads run as Anna, who owns Storm. Stored readings: <strong id="stored">0</strong>.</p>
+  </section>
+
+  <section class="story" aria-labelledby="outbox-title">
+    <h2 id="outbox-title">Events waiting for external systems</h2>
+    <p>Registering or transferring a product writes an event in the same transaction as the change, so a change is never saved without being announced. An Edge Function delivers them with a signature and an idempotency key, retrying with backoff.</p>
+    <table class="results outbox">
+      <thead><tr><th scope="col">Id</th><th scope="col">Event</th><th scope="col">Data</th><th scope="col">Delivery</th></tr></thead>
+      <tbody id="outbox-body"><tr class="placeholder"><td colspan="4">Nothing yet. Register the rug above.</td></tr></tbody>
+    </table>
+  </section>
+
+  <footer>
+    <p>In the repository: the <a href="https://github.com/getupworkdev/equestrian-backend-demo/tree/main/supabase/migrations">migrations</a>, the <a href="https://github.com/getupworkdev/equestrian-backend-demo/blob/main/docs/API_CONTRACT.md">API contract</a> generated from them, the <a href="https://github.com/getupworkdev/equestrian-backend-demo/tree/main/supabase/functions">Edge Functions</a> and the <a href="https://github.com/getupworkdev/equestrian-backend-demo/tree/main/tests">tests</a> that run in CI on every push.</p>
+    <p>People, horses, stables and products are fictional.</p>
+  </footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script type="module" src="explorer.js"></script>
+</body>
+</html>

@@ -1,10 +1,18 @@
 # Equestrian platform backend: the foundation
 
-A Supabase/PostgreSQL backend foundation for a mobile platform where one person can be the **owner of one horse and the trainer of another**, with a Bluetooth sensor that records readings offline. Written as versioned migrations and proven by 22 permission and sync tests that run in-process, with no Supabase account or Docker.
+A Supabase/PostgreSQL backend foundation for a mobile platform where one person can be the **owner of one horse and the trainer of another**, with a Bluetooth sensor that records readings offline, QR product registration with a digital product passport, and reliable integrations with external systems. Written as versioned migrations and proven by 56 tests that run in-process, with no Supabase account or Docker.
+
+**Try it live: [getupworkdev.github.io/equestrian-backend-demo](https://getupworkdev.github.io/equestrian-backend-demo/)**. The same migrations run in PostgreSQL inside your browser: a grid of who can do what (every mark is a real call), each person's app screen drawn from what the API returns, a QR passport scan, an offline sensor upload sent twice, and the outbox filling up.
+
+![Permission grid: every mark is a real call to the API as that person](docs/screenshots/permission-grid.png)
+
+![The same rules as each person's app: Anna is trainer on Luna and owner on Storm; Dana manages the stable and can only read](docs/screenshots/app-preview.png)
 
 ```bash
 npm install
-npm test        # 22 tests, ~3 s
+npm test           # 56 tests, ~15 s
+npm run contract   # regenerate docs/API_CONTRACT.md after changing the API
+npm run pages      # refresh the live page's copy of the migrations
 ```
 
 Everything here is fictional and generic: no client code, data or brand.
@@ -40,10 +48,30 @@ The tests also prove the policies can't be bypassed: direct writes to `app.*` ar
 
 [`tests/sync.test.ts`](tests/sync.test.ts) covers the duplicate batch, the partially overlapping batch, partition creation, the stranger who can't upload, and the offline-then-sync sequence with an update and a deletion.
 
+### QR product passport ([`0005_product_passport.sql`](supabase/migrations/0005_product_passport.sql))
+
+- **Scan without an account.** `api_v1.passport(code)` is the one function `anon` may call. It returns the public passport (type, model, batch, materials, care, whether it is registered) and nothing about the owner.
+- **Owner section for the owner only:** the horse it is attached to and the ownership history.
+- **Registration is retry-safe** (the same owner registering again gets the same answer) and **can't be taken over**: a registered product only moves by `transfer_product` from its current owner.
+- Attaching a product to a horse uses the same `has_horse_role` check: owner or trainer, not caretaker.
+
+[`tests/passport.test.ts`](tests/passport.test.ts) also checks that a stranger's scan never contains the owner's name and that a failed write leaves no event behind.
+
+### Integrations: outbox, webhooks, signed media URLs ([`0004_integrations.sql`](supabase/migrations/0004_integrations.sql), [`supabase/functions`](supabase/functions))
+
+- **Transactional outbox.** Registering or transferring a product writes an event in the same transaction as the change. `outbox-dispatch` claims a batch (`FOR UPDATE SKIP LOCKED`, so two dispatchers never deliver the same event), sends each with an HMAC signature and `Idempotency-Key: outbox-<id>`, and records the outcome. Failures back off 30 s, 1 min, 2 min, ... and are marked dead after 8 attempts for a human to look at.
+- **Inbound webhooks.** `webhook-receiver` verifies the signature on the raw body (with a 5-minute replay window and a constant-time compare) before parsing anything, then stores the event once per (provider, event id): a re-delivery is answered "duplicate" and not processed again.
+- **Signed media URLs.** `horse-media-url` asks the database, as the user, whether they may read or upload a horse's photos (`api_v1.authorize_horse_media`, same permission check), then signs a short-lived Storage URL with the service key. The bucket stays private.
+- The signature and delivery rules are plain modules in [`_shared`](supabase/functions/_shared), tested in [`tests/integrations.test.ts`](tests/integrations.test.ts) together with the backoff schedule and the permission checks.
+
+### An API contract that can't drift ([`docs/API_CONTRACT.md`](docs/API_CONTRACT.md))
+
+Generated from the database itself: each view's columns, each function's arguments and return type, who may call it (from the grants), and the errors it can raise (read from the function bodies), with descriptions kept as `COMMENT ON` in [`0006_api_docs.sql`](supabase/migrations/0006_api_docs.sql). CI fails if the committed contract and the migrations disagree, or if anything in `api_v1` is undocumented, so the iOS and Android developers always read the contract that actually runs.
+
 ## How the tests run without Supabase
 
 [`tests/db.ts`](tests/db.ts) starts an in-process Postgres ([PGlite](https://pglite.dev)), applies the migrations in order, and runs each test block as a signed-in user the way PostgREST does: `set local role authenticated` plus `request.jwt.claims` carrying the user id. `auth.uid()` is shimmed to read that claim, so the same SQL runs on Supabase unchanged. CI runs the suite on every push ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 ## What is not here
 
-Edge Functions for external integrations (webhook verification, idempotency keys, outbox), the staging/production deployment pipeline, and the QR product passport: each is a work package of its own, and each would start the same way, with the contract in SQL and the permission tests first.
+The staging/production deployment pipeline (`supabase db push` and `supabase functions deploy` from GitHub Actions, per environment, with a manual approval for production) needs real Supabase projects and secrets, so it isn't simulated here. The Edge Functions are written for Deno and run on Supabase; their logic is tested here, their HTTP wiring is not.
