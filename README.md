@@ -4,6 +4,10 @@ A Supabase/PostgreSQL backend foundation for a mobile platform where one person 
 
 **Try the app: [getupworkdev.github.io/equestrian-backend-demo/app](https://getupworkdev.github.io/equestrian-backend-demo/app/)**. A working phone app on these exact migrations: the database runs on your device, so open it on a phone, pick a person, log training with no signal and watch it sync, scan a product and register it, and see what a stable manager can and cannot do. Add it to your home screen and it opens offline.
 
+**Watch the walkthrough: [2-minute captioned video](https://getupworkdev.github.io/equestrian-backend-demo/media/walkthrough.mp4)** (no sound needed). Owner and trainer rights on different horses, logging training offline and syncing it, the caretaker and stable manager views, and the QR passport.
+
+**How the real work would start: [first work package, 2 weeks](https://getupworkdev.github.io/equestrian-backend-demo/media/first-work-package.pdf)**. Day-by-day deliverables, what gets reviewed at each step, what "done" means, and the decisions needed up front.
+
 **Explore the rules: [getupworkdev.github.io/equestrian-backend-demo](https://getupworkdev.github.io/equestrian-backend-demo/)**. The same migrations run in PostgreSQL inside your browser: a grid of who can do what (every mark is a real call), each person's app screen drawn from what the API returns, a QR passport scan, an offline sensor upload sent twice, and the outbox filling up.
 
 ![Permission grid: every mark is a real call to the API as that person](docs/screenshots/permission-grid.png)
