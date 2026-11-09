@@ -260,7 +260,9 @@ async function horse(tok, id) {
   const device = (await call(`select serial from api_v1.sensor_devices where horse_id = $1 limit 1`, [id])).rows?.[0];
   const canLog = await can(`select api_v1.upsert_training_log(gen_random_uuid(), $1, current_date, 1, 'check')`, [id]).then(async (r) => { if (r.ok) await admin(`delete from app.training_logs where notes = 'check' and horse_id = $1`, [id]); return r; });
   const canPhoto = await can(`select api_v1.authorize_horse_media($1, 'write')`, [id]);
-  const canInvite = await can(`select api_v1.set_horse_role($1, $1, 'caretaker')`, [id]);
+  // Probe with a user id that can't exist: an owner passes the permission check and
+  // then hits the foreign key (nothing is written); anyone else gets "forbidden".
+  const canInvite = await can(`select api_v1.set_horse_role($1, $1, 'caretaker')`, [id]).then((r) => (!r.ok && /foreign key/i.test(r.why) ? { ok: true } : r));
   const canSensor = await can(`select api_v1.register_sensor($1, 'BLE-CHECK-00')`, [id]).then(async (r) => { if (r.ok) await admin(`delete from app.sensor_devices where serial = 'BLE-CHECK-00'`); return r; });
   const pendingHere = queue.filter((q) => q.horse === id).length;
   render(`<div class="hero"><a class="back" href="#/home" aria-label="Back to my horses"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></a><span>Photo of ${esc(h.name)}</span></div>

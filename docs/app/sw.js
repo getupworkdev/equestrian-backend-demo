@@ -1,7 +1,7 @@
 // Caches the app shell, the database engine and the migrations on first visit,
 // so the app opens with no signal afterwards. The data itself lives in the
 // browser's IndexedDB through the database, not in this cache.
-const CACHE = 'stable-app-v3';
+const CACHE = 'stable-app-v4';
 const SHELL = ['./', './index.html', './app.css', './app.js', './manifest.webmanifest', './icon.svg', '../sql/index.json'];
 
 self.addEventListener('install', (e) => {
